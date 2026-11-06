@@ -2960,10 +2960,10 @@ select.fi{cursor:pointer;appearance:none;background-image:url("data:image/svg+xm
     </div>
     <div class="frow">
       <div class="fg"><label class="fl">U (unidades rack)</label><input class="fi" id="treq-u" type="number" min="1" max="20" placeholder="2"/></div>
-      <div class="fg"><label class="fl">U Origen (posición)</label><input class="fi" id="treq-uorig" type="number" min="1" placeholder="3"/></div>
+      <div class="fg"><label class="fl">U Origen (posición)</label><input class="fi" id="treq-uorig" type="text" placeholder="ej. 3 o 18-19-20"/></div>
     </div>
     <div class="frow">
-      <div class="fg"><label class="fl">U Destino (posición)</label><input class="fi" id="treq-udest" type="number" min="1" placeholder="3"/></div>
+      <div class="fg"><label class="fl">U Destino (posición)</label><input class="fi" id="treq-udest" type="text" placeholder="ej. 3 o 18-19-20"/></div>
       <div class="fg"><label class="fl">Peso (kg)</label><input class="fi" id="treq-peso" type="number" min="0" step="0.1" placeholder="18"/></div>
     </div>
     <div class="fg"><label class="fl">Observaciones</label><input class="fi" id="treq-obs" placeholder="Notas adicionales sobre el equipo..."/></div>
@@ -10085,8 +10085,8 @@ function trSaveEquipo(andLabel){
     ip:document.getElementById('treq-ip').value.trim(),
     estado:document.getElementById('treq-estado').value,
     u:parseInt(document.getElementById('treq-u').value)||2,
-    uOrig:parseInt(document.getElementById('treq-uorig').value)||0,
-    uDest:parseInt(document.getElementById('treq-udest').value)||0,
+    uOrig:document.getElementById('treq-uorig').value.trim(),
+    uDest:document.getElementById('treq-udest').value.trim(),
     rackOrig:document.getElementById('treq-rackorig').value.trim(),
     rackDest:document.getElementById('treq-rackdest').value.trim(),
     peso:parseFloat(document.getElementById('treq-peso').value)||0,
@@ -10244,6 +10244,8 @@ function trImportExcel(event){
     return {iSerial,iMarca,iModelo,iTipo,iEstado,iU,iUOrig,iUDest,iROrig,iRDest};
   };
 
+  // U de rack: conserva el texto tal cual (ej. "18-19-20"), sin convertir a un solo numero
+  const normU=v=>(v===undefined||v===null)?'':v.toString().trim();
   const processRows=async(rawRows)=>{
     if(!rawRows.length){toast('error','Error','Sin filas válidas en el archivo');return;}
     const all=DB.get('equipos');
@@ -10266,8 +10268,8 @@ function trImportExcel(event){
         tipo:r.tipo?.toString().trim()||existing?.tipo||'Servidor',
         estado:r.estado?.toString().trim()||existing?.estado||'En origen',
         u:parseInt(r.u)||existing?.u||2,
-        uOrig:parseInt(r.uOrig)||existing?.uOrig||0,
-        uDest:parseInt(r.uDest)||existing?.uDest||0,
+        uOrig:normU(r.uOrig)||existing?.uOrig||'',
+        uDest:normU(r.uDest)||existing?.uDest||'',
         rackOrig:r.rackOrig?.toString().trim()||existing?.rackOrig||'',
         rackDest:r.rackDest?.toString().trim()||existing?.rackDest||'',
         peso:parseFloat(r.peso)||existing?.peso||0,
@@ -10337,6 +10339,8 @@ function trImportExcel(event){
           else if(nk.includes('tipo'))                           o.tipo     =r[k];
           else if(nk.includes('estado'))                         o.estado   =r[k];
           else if(nk==='u'||nk==='u ')                           o.u        =r[k];
+          else if(/^u\b/.test(nk)&&nk.includes('orig'))          o.uOrig    =r[k];
+          else if(/^u\b/.test(nk)&&nk.includes('dest'))          o.uDest    =r[k];
           else if(nk.includes('u orig')||nk.includes('uorig'))   o.uOrig    =r[k];
           else if(nk.includes('u dest')||nk.includes('udest'))   o.uDest    =r[k];
           else if(nk.includes('rack orig')||nk.includes('rack or'))o.rackOrig=r[k];
@@ -10364,10 +10368,10 @@ function trImportExcel(event){
       const iModelo=gi(['modelo']);
       const iTipo=gi(['tipo']);const iEstado=gi(['estado']);
       const iU=gi(['u ','u\t',' u','unidades rack']);
-      const iUOrig=gi(['u orig','uorig','u origen']);
-      const iUDest=gi(['u dest','udest','u destino']);
-      const iROrig=gi(['rack origen','rack orig','rackorig']);
-      const iRDest=gi(['rack destino','rack dest','rackdest']);
+      const iUOrig=gi(['u rack orig','u orig','uorig','u origen']);
+      const iUDest=gi(['u rack dest','u dest','udest','u destino']);
+      const iROrig=headers.findIndex(h=>/^rack\s*orig/.test(h)); 
+      const iRDest=headers.findIndex(h=>/^rack\s*dest/.test(h));
       const iIP=gi(['ip','ipmi','ip management']);  // 🔧 FIX: Variable que faltaba
       const iPeso=gi(['peso']);
       const iObs=gi(['obs']);
@@ -10404,7 +10408,7 @@ function renderTrRacks(){
   function buildRackHTML(rackEqs, useUOrig){
     const occupied={};
     rackEqs.forEach(e=>{
-      const startU=useUOrig?(+e.uOrig||0):(+e.uDest||0);
+      const startU=useUOrig?(parseInt(e.uOrig)||0):(parseInt(e.uDest)||0);
       const size=+e.u||1;
       if(!startU) return;
       for(let i=0;i<size;i++) occupied[startU+i]={e,isFirst:i===0,size};
