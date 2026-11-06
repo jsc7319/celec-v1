@@ -11559,12 +11559,18 @@ function _openLabelPrintWindow(eqs, p) {
 <script>
   /* Reduce la fuente de cada texto hasta que quepa completo (sin cortes) */
   document.querySelectorAll('.lbl-serial,.lbl-barcode-txt,.lbl-val,.lbl-lbl').forEach(function(el){
-    var min = el.classList.contains('lbl-val') || el.classList.contains('lbl-lbl') ? 5 : 4;
+    var min = el.classList.contains('lbl-lbl') ? 5 : el.classList.contains('lbl-barcode-txt') ? 4.5 : 7;
     var pt = parseFloat(getComputedStyle(el).fontSize) * 0.75;
     el.style.textOverflow = 'clip';
     while (el.scrollWidth > el.clientWidth + 0.5 && pt > min) {
       pt -= 0.5;
       el.style.fontSize = pt + 'pt';
+    }
+    /* Si aun con la letra minima no cabe, pasa a una segunda linea en vez de cortarse */
+    if (el.scrollWidth > el.clientWidth + 0.5) {
+      el.style.whiteSpace = 'normal';
+      el.style.overflowWrap = 'anywhere';
+      el.style.lineHeight = '1.15';
     }
   });
 <\/script>
