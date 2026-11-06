@@ -10326,9 +10326,12 @@ function trImportExcel(event){
       const wb=XLSX.read(e.target.result,{type:'array'});
       const ws=wb.Sheets[wb.SheetNames[0]];
       const raw=XLSX.utils.sheet_to_json(ws,{defval:''});
+      // Texto tal como se ve en Excel (ej. "2-3" aunque Excel lo haya guardado como fecha)
+      const rawTxt=XLSX.utils.sheet_to_json(ws,{defval:'',raw:false});
       // Normalize keys
-      const rows=raw.map(r=>{
+      const rows=raw.map((r,ri)=>{
         const o={};
+        const txt=rawTxt[ri]||{};
         Object.keys(r).forEach(k=>{
           const nk=norm(k);
           // Map normalized header to field name
@@ -10339,10 +10342,10 @@ function trImportExcel(event){
           else if(nk.includes('tipo'))                           o.tipo     =r[k];
           else if(nk.includes('estado'))                         o.estado   =r[k];
           else if(nk==='u'||nk==='u ')                           o.u        =r[k];
-          else if(/^u\b/.test(nk)&&nk.includes('orig'))          o.uOrig    =r[k];
-          else if(/^u\b/.test(nk)&&nk.includes('dest'))          o.uDest    =r[k];
-          else if(nk.includes('u orig')||nk.includes('uorig'))   o.uOrig    =r[k];
-          else if(nk.includes('u dest')||nk.includes('udest'))   o.uDest    =r[k];
+          else if(/^u\b/.test(nk)&&nk.includes('orig'))          o.uOrig    =txt[k]??r[k];
+          else if(/^u\b/.test(nk)&&nk.includes('dest'))          o.uDest    =txt[k]??r[k];
+          else if(nk.includes('u orig')||nk.includes('uorig'))   o.uOrig    =txt[k]??r[k];
+          else if(nk.includes('u dest')||nk.includes('udest'))   o.uDest    =txt[k]??r[k];
           else if(nk.includes('rack orig')||nk.includes('rack or'))o.rackOrig=r[k];
           else if(nk.includes('rack dest'))                      o.rackDest =r[k];
           
