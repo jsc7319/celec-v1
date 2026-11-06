@@ -9,6 +9,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
+<script>
+/* Respaldo: si el CDN principal falla (pasa a veces con datos moviles), carga desde otro */
+if(!window.supabase) document.write('<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.js"><\/script>');
+if(!window.XLSX) document.write('<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"><\/script>');
+if(!window.qrcode) document.write('<script src="https://unpkg.com/qrcode-generator@1.4.4/qrcode.js"><\/script>');
+</script>
 <style>
 :root {
   --bg0:#F0F2F7;--bg1:#FFFFFF;--bg2:#FAFBFD;--bg3:#F0F2F7;--bg4:#E4E8F2;
@@ -57,6 +63,28 @@ body{background:var(--bg0);color:var(--t1);font-family:var(--f);display:flex;fon
   #sbOverlay.show{display:block}
   .topbar{padding:0 14px}
   .topbar-right{gap:6px}
+}
+/* ── Ajustes para celular ── */
+.form-input{width:100%;padding:9px 12px;background:var(--gray-50);border:1.5px solid var(--bdr2);border-radius:var(--r2);color:var(--t1);font-family:var(--f);font-size:13.5px}
+/* 100vh en movil incluye la barra del navegador y corta el final de la pantalla */
+@supports (height:100dvh){ .sb,.main{height:100dvh} }
+@media(max-width:820px){
+  .breadcrumb{min-width:0;flex:1;overflow:hidden;white-space:nowrap}
+  .breadcrumb span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #bc-root{flex-shrink:1;min-width:0}
+  .topbar-right{flex-shrink:0}
+  #clock-top{display:none}
+  #top-user-name{display:none}
+  .content{padding:14px}
+  .page-header{flex-wrap:wrap;gap:10px}
+  .ph-right{flex-wrap:wrap;width:100%}
+  .ph-right .search-wrap{flex:1 1 100%;min-width:0}
+  .ph-right .search-wrap input,#proy-srch{width:100%!important}
+  #proy-filt-est{width:auto!important;flex:1}
+  #proy-kanban{display:flex!important;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;padding-bottom:6px}
+  #proy-kanban > *{flex:0 0 78%;scroll-snap-align:start;min-width:0}
+  .modal{max-height:92dvh;overflow-y:auto}
+  input,select,textarea{font-size:16px!important} /* evita zoom automatico en iPhone */
 }
 .breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px}
 .bc-root{color:var(--t2);font-weight:500}.bc-sep{color:var(--t4);font-size:10px}.bc-cur{color:var(--t1);font-weight:600}
@@ -1465,7 +1493,7 @@ select.fi{cursor:pointer;appearance:none;background-image:url("data:image/svg+xm
               <span style="position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:13px;pointer-events:none">🔍</span>
               <input class="form-input" style="width:190px;padding-left:34px" id="proy-srch" placeholder="Buscar proyecto..." oninput="renderProyectos()">
             </div>
-            <select class="form-input" id="proy-filt-est" style="width:150px" onchange="renderProyectos()">
+            <select class="form-input" id="proy-filt-est" style="width:auto;min-width:150px" onchange="renderProyectos()">
               <option value="">Todos los estados</option>
               <option>En curso</option><option>Pendiente</option><option>Completado</option><option>Cancelado</option>
             </select>
@@ -3833,17 +3861,33 @@ async function _sbSyncComentarios(v, prev){
 /* ════════════════════════════════════════════════════════
    CARGA INICIAL DESDE SUPABASE → localStorage
    ════════════════════════════════════════════════════════ */
+/* Carga una tabla simple con reintentos (en celular la red falla a ratos) */
+async function _sbLoadTable(k, intentos=3){
+  const m=M[k]; if(!m) return true;
+  for(let i=0;i<intentos;i++){
+    try{
+      const {data,error}=await _sb.from(m.t).select('*');
+      if(!error){ localStorage.setItem('mt_'+k, JSON.stringify((data||[]).map(m.from))); return true; }
+      console.warn('[load]',k,error.message);
+    }catch(e){ console.warn('[load]',k,e.message); }
+    await new Promise(r=>setTimeout(r, 700*(i+1)));
+  }
+  return false;
+}
+
 async function loadAllFromSupabase(){
   // Tablas simples en paralelo
   const simples=['clientes','proyectos','actividades','equipos',
     'datacenters','polizas','tiposequipos','terceros','vehiculos','herramientas','jornadas'];
-  await Promise.all(simples.map(async k=>{
-    const m=M[k];
-    try{
-      const {data,error}=await _sb.from(m.t).select('*');
-      if(!error) localStorage.setItem('mt_'+k, JSON.stringify((data||[]).map(m.from)));
-    }catch(_){}
-  }));
+  const res = await Promise.all(simples.map(k=>_sbLoadTable(k)));
+  const fallidas = simples.filter((k,i)=>!res[i]);
+  if(fallidas.length){
+    toast('warn','Conexión inestable','Algunos datos no cargaron ('+fallidas.join(', ')+'). Reintentando…');
+    setTimeout(async()=>{
+      const ok = await Promise.all(fallidas.map(k=>_sbLoadTable(k)));
+      if(ok.every(Boolean)){ toast('success','Datos cargados','Se completó la carga ✓'); _refrescarVistaActual(); }
+    }, 4000);
+  }
   // Cargar usuarios/perfiles desde Supabase
   await _sbLoadPerfiles();
   // Tablas complejas en paralelo
@@ -3968,7 +4012,7 @@ function _setupRealtime(){
 
   let ch = _sb.channel('celec-changes')
     .on('postgres_changes',{event:'*',schema:'public',table:'equipos'},
-      ()=>{ if(curProj||curTrProj){ renderMgD?.(); renderTrDetail?.(); }})
+      async()=>{ await _sbLoadTable('equipos'); if(curProj) renderMgD?.(); _refrescarVistaActual(); })
     .on('postgres_changes',{event:'*',schema:'public',table:'minutograma_celdas'},
       async()=>{ await _sbLoadMg(); if(curProj) renderMgD?.(); })
     .on('postgres_changes',{event:'*',schema:'public',table:'comentarios_traslado'},
@@ -4002,6 +4046,22 @@ async function _sbReloadDoc(k){
 }
 
 /* Refresca la vista actualmente visible (la que tenga vista activa) */
+/* Al volver a la app (celular en segundo plano) o al recuperar internet,
+   se recargan los datos y se reconecta el tiempo real */
+let _hiddenAt = 0, _reloading = false;
+async function _recargarAlVolver(){
+  if(_reloading || !currentUser || !_sbReady) return;
+  _reloading = true;
+  try{ await loadAllFromSupabase(); _setupRealtime(); _refrescarVistaActual(); }
+  catch(e){ console.warn('[reload]', e.message); }
+  _reloading = false;
+}
+document.addEventListener('visibilitychange',()=>{
+  if(document.hidden){ _hiddenAt = Date.now(); return; }
+  if(_hiddenAt && Date.now()-_hiddenAt > 30000) _recargarAlVolver();
+});
+window.addEventListener('online', ()=>_recargarAlVolver());
+
 function _refrescarVistaActual(){
   const v = document.querySelector('.view.active')?.id || '';
   try{
@@ -4012,6 +4072,9 @@ function _refrescarVistaActual(){
     else if(v==='view-inspeccion') curInspProj ? renderInspTab?.() : renderInspeccion?.();
     else if(v==='view-jornadas') renderJornadas?.();
     else if(v==='view-usuarios') renderUsuarios?.();
+    else if(v==='view-dashboard') renderDashboard?.();
+    else if(v==='view-proyectos') renderProyectos?.();
+    else if(v==='view-clientes') renderClientes?.();
   }catch(_){}
 }
 
