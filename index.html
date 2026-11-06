@@ -11359,6 +11359,9 @@ function _openLabelPrintWindow(eqs, p) {
       flex-direction: column;
       align-items: center;
       flex-shrink: 0;
+      width: 34mm;
+      max-width: 34mm;
+      overflow: hidden;
     }
     .lbl-right {
       flex: 1;
@@ -11372,9 +11375,10 @@ function _openLabelPrintWindow(eqs, p) {
       color: #000000;
       margin-bottom: 1.5mm;
       padding-top: 1mm;
+      max-width: 100%;
+      text-align: center;
       white-space: nowrap;
       overflow: hidden;
-      text-overflow: ellipsis;
     }
     .lbl-tipo {
       display: inline-block;
@@ -11407,6 +11411,8 @@ function _openLabelPrintWindow(eqs, p) {
       color: #000000;
       text-align: center;
       margin-bottom: 1.5mm;
+      max-width: 100%;
+      word-break: break-all;
     }
     hr.lbl-rule { border: none; border-top: .4px solid #000000; margin: 1.2mm 0; }
     .lbl-fields {
@@ -11454,6 +11460,15 @@ function _openLabelPrintWindow(eqs, p) {
   const ST_B = {'En origen':'#FFF7ED','Desenrackado':'#FFFBEB','En traslado':'#EFF6FF','Enrackado':'#ECFDF5','Verificado':'#F0FDF4'};
   const LOGO_SRC = "";
 
+  /* Ajusta el tamaño de fuente (pt) para que el texto quepa completo en el ancho (mm) dado.
+     Courier New: ancho de caracter ≈ 0.6em; 1pt = 0.3528mm. */
+  function fitPt(text, widthMm, maxPt, minPt, spacingMm) {
+    const n = String(text||'').length || 1;
+    const pt = (widthMm / n - (spacingMm||0)) / (0.6 * 0.3528);
+    return Math.max(minPt, Math.min(maxPt, Math.floor(pt*2)/2));
+  }
+  const fs = (text, w, max, min, sp) => `style="font-size:${fitPt(text,w,max,min,sp)}pt"`;
+
   function qlLabel(e, cat) {
     cat = cat||'Equipo';
     const cli2 = cli;
@@ -11469,7 +11484,7 @@ function _openLabelPrintWindow(eqs, p) {
     const rackDest = e.rackDest||e.rackdest||'—';
     const uOrig    = e.uOrig||'—';
     const uDest    = e.uDest||e.u||'—';
-    const marca    = ((e.marca||'')+(e.modelo?' '+e.modelo:'')).substring(0,18)||'—';
+    const marca    = ((e.marca||'')+(e.modelo?' '+e.modelo:'')).substring(0,28)||'—';
 
     return `<div class="lbl">
   <div class="lbl-hdr">
@@ -11485,35 +11500,35 @@ function _openLabelPrintWindow(eqs, p) {
   </div>
   <div class="lbl-body">
     <div class="lbl-left">
-      <div class="lbl-serial">${ser}</div>
+      <div class="lbl-serial" ${fs(ser,33,13,5.5,.26)}>${ser}</div>
       <div style="display:flex;justify-content:center;margin-bottom:.6mm">${barcode}</div>
-      <div class="lbl-barcode-txt">${serFmt}</div>
+      <div class="lbl-barcode-txt" ${fs(serFmt,33,6,4,.26)}>${serFmt}</div>
     </div>
     <div class="lbl-right">
       <div class="lbl-field" style="margin-bottom:2mm">
         <span class="lbl-lbl">Marca / Modelo</span>
-        <span class="lbl-val ${marca==='—'?'dash':''}">${marca}</span>
+        <span class="lbl-val ${marca==='—'?'dash':''}" ${fs(marca,39,12,7)}>${marca}</span>
       </div>
       <div class="lbl-field" style="margin-bottom:2mm">
         <span class="lbl-lbl">Cliente final</span>
-        <span class="lbl-val ${cli2?'':'dash'}">${cli2||'—'}</span>
+        <span class="lbl-val ${cli2?'':'dash'}" ${fs(cli2||'—',39,12,7)}>${cli2||'—'}</span>
       </div>
       <div class="lbl-fields">
         <div class="lbl-field">
           <span class="lbl-lbl">Rack Origen</span>
-          <span class="lbl-val ${rackOrig==='—'?'dash':''}">${rackOrig}</span>
+          <span class="lbl-val ${rackOrig==='—'?'dash':''}" ${fs(rackOrig,18,12,7)}>${rackOrig}</span>
         </div>
         <div class="lbl-field">
           <span class="lbl-lbl">Rack Destino</span>
-          <span class="lbl-val ${rackDest==='—'?'dash':''}">${rackDest}</span>
+          <span class="lbl-val ${rackDest==='—'?'dash':''}" ${fs(rackDest,18,12,7)}>${rackDest}</span>
         </div>
         <div class="lbl-field">
           <span class="lbl-lbl">U Rack Origen</span>
-          <span class="lbl-val ${uOrig==='—'?'dash':''}">${uOrig}</span>
+          <span class="lbl-val ${uOrig==='—'?'dash':''}" ${fs(uOrig,18,12,7)}>${uOrig}</span>
         </div>
         <div class="lbl-field">
           <span class="lbl-lbl">U Rack Destino</span>
-          <span class="lbl-val ${uDest==='—'?'dash':''}">${uDest}</span>
+          <span class="lbl-val ${uDest==='—'?'dash':''}" ${fs(uDest,18,12,7)}>${uDest}</span>
         </div>
       </div>
     </div>
@@ -11540,7 +11555,20 @@ function _openLabelPrintWindow(eqs, p) {
   <meta charset="UTF-8">
   <title>QL-800 · ${p.nombre||'Equipos'} · ${eqs.length} labels</title>
   <style>${css}</style>
-</head><body>${labelsHTML}</body></html>`);
+</head><body>${labelsHTML}
+<script>
+  /* Reduce la fuente de cada texto hasta que quepa completo (sin cortes) */
+  document.querySelectorAll('.lbl-serial,.lbl-barcode-txt,.lbl-val,.lbl-lbl').forEach(function(el){
+    var min = el.classList.contains('lbl-val') || el.classList.contains('lbl-lbl') ? 5 : 4;
+    var pt = parseFloat(getComputedStyle(el).fontSize) * 0.75;
+    el.style.textOverflow = 'clip';
+    while (el.scrollWidth > el.clientWidth + 0.5 && pt > min) {
+      pt -= 0.5;
+      el.style.fontSize = pt + 'pt';
+    }
+  });
+<\/script>
+</body></html>`);
   w.document.close();
 
   const waitAndPrint = () => {
