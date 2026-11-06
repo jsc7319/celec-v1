@@ -863,6 +863,8 @@ select.fi{cursor:pointer;appearance:none;background-image:url("data:image/svg+xm
   font-size:18px;font-weight:900;
   letter-spacing:1.5px;color:#0D2145;
   line-height:1.3;padding:2px 0;
+  max-width:100%;min-width:0;flex:1;
+  white-space:nowrap;overflow:hidden;
 }
 .label-serial-small{
   font-size:8px;color:#9CA3AF;
@@ -887,6 +889,7 @@ select.fi{cursor:pointer;appearance:none;background-image:url("data:image/svg+xm
 }
 .label-code-text{
   font-size:7.5px;text-align:center;
+  max-width:100%;
   color:#9CA3AF;letter-spacing:1.5px;
   margin-bottom:5px;
   font-family:var(--fm);
@@ -901,7 +904,7 @@ select.fi{cursor:pointer;appearance:none;background-image:url("data:image/svg+xm
   gap:3px 8px;
 }
 .label-field{
-  display:flex;flex-direction:column;gap:1px;
+  display:flex;flex-direction:column;gap:1px;min-width:0;
 }
 .label-field-lbl{
   font-size:7px;font-weight:700;
@@ -10640,8 +10643,9 @@ function trShowLabelsForEquipos(eqs){
   const cli=(DB.get('clientes').find(c=>c.id===p.clienteId)||{}).nombre||'';
   const STATUS_COLORS={'En origen':'#C2410C','Desenrackado':' #D97706','En traslado':'#2563EB','Enrackado':'#059669','Verificado':'#15803D'};
   const STATUS_BG={'En origen':'#FFF7ED','Desenrackado':'#FFFBEB','En traslado':'#EFF6FF','Enrackado':'#ECFDF5','Verificado':'#F0FDF4'};
-  document.getElementById('tr-labels-grid').innerHTML=eqs.flatMap(e=>['Equipo','Rieles','Cables'].map(cat=>genLabelHTML(e,p,cli,cat))).join('');
+  window.trLabelData = { eqs, p };
   document.getElementById('m-tr-labels').classList.add('open');
+  updateLabelsPreview();
 }
 
 // === INICIO DE JORNADA (foto en vivo + GPS + fecha/hora) ===
@@ -11130,7 +11134,7 @@ function genLabelHTML(e,p,cli,cat){
   const CAT_BG={Equipo:'#EFF6FF',Rieles:'#FFF7ED',Cables:'#F5F3FF'};
   const catC=CAT_COLORS[cat]||'#2563EB', catB=CAT_BG[cat]||'#EFF6FF';
   
-  const marca = ((e.marca||'')+(e.modelo?' '+e.modelo:'')).substring(0,22)||'—';
+  const marca = ((e.marca||'')+(e.modelo?' '+e.modelo:'')).substring(0,28)||'—';
   
   return `<div class="label-card">
     <!-- HEADER -->
@@ -11227,45 +11231,17 @@ function updateLabelsPreview() {
   if (document.getElementById('lbl-rieles')?.checked !== false) tipos.push('Rieles');
   if (document.getElementById('lbl-cables')?.checked !== false) tipos.push('Cables');
   
-  const totalLabels = eqs.length * tipos.length;
-  grid.innerHTML = eqs.flatMap(e => tipos.map(cat => {
-    const marca = e.marca && e.marca.trim() ? `${e.marca} ${e.modelo||''}`.trim() : '—';
-    const cli2 = (DB.get('clientes').find(c=>c.id===e.clienteId)||{}).nombre||'';
-    const rackOrig = e.rackOrigen||'—';
-    const rackDest = e.rackDestino||'—';
-    const uOrig = e.uRackOrigen||'—';
-    const uDest = e.uRackDestino||'—';
-    const catC = {'Equipo':'#0D2145','Rieles':'#7C3AED','Cables':'#DC2626'}[cat]||'#0D2145';
-    const catB = {'Equipo':'#DBEAFE','Rieles':'#F3E8FF','Cables':'#FEE2E2'}[cat]||'#DBEAFE';
-    
-    return `<div class="label-card" style="margin-bottom:14px">
-      <div class="label-header" style="background:#fff;border-bottom:1px solid #E5E7EB;padding:6px 10px;display:flex;justify-content:space-between;align-items:center">
-        <div style="font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:#0D2145">${p.nombre||'Equipos'}</div>
-        <span style="display:inline-flex;align-items:center;padding:3px 8px;border-radius:20px;font-size:8.5px;font-weight:800;border:1px solid;color:${catC};background:${catB};border-color:${catC}60">${cat}</span>
-      </div>
-      <div class="label-body" style="padding:8px 10px;flex:1">
-        <div style="font-size:18px;font-weight:900;letter-spacing:1px;color:#0D2145;margin-bottom:6px">${e.serial||'—'}</div>
-        <div style="display:flex;gap:8px">
-          <div style="flex:0">
-            <div style="width:80px;height:80px;background:#fff;border:1px solid #e5e7eb;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#9ca3af">QR</div>
-            <div style="font-size:7px;color:#9ca3af;text-align:center;margin-top:2px;letter-spacing:1px">${e.serial||'—'}</div>
-          </div>
-          <div style="flex:1;display:flex;flex-direction:column;gap:2px;font-size:9px">
-            <div><span style="color:#9ca3af;font-size:7px;font-weight:700;text-transform:uppercase">Marca/Modelo</span><br><span style="font-weight:700">${marca}</span></div>
-            <div><span style="color:#9ca3af;font-size:7px;font-weight:700;text-transform:uppercase">Cliente</span><br><span style="font-weight:700">${cli2||'—'}</span></div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:8px">
-              <div><span style="color:#9ca3af;font-weight:700">Rack O.</span><br>${rackOrig}</div>
-              <div><span style="color:#9ca3af;font-weight:700">Rack D.</span><br>${rackDest}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>`;
-  })).join('');
+  // Preview identico al label impreso (mismo HTML/CSS que la ventana de impresion)
+  grid.style.display = 'block';
+  grid.innerHTML = '<iframe id="tr-labels-iframe" title="Preview labels" style="width:100%;border:0;display:block;min-height:260px"></iframe>';
+  const fr = document.getElementById('tr-labels-iframe');
+  fr.onload = () => { try { fr.style.height = fr.contentDocument.documentElement.scrollHeight + 'px'; } catch(_){} };
+  fr.srcdoc = _openLabelPrintWindow(eqs, p, {preview:true}) || '';
 }
 
 /* ── Generar ventana de impresión para Brother QL-800 (DK-11202: 62mm × 100mm) ── */
-function _openLabelPrintWindow(eqs, p) {
+function _openLabelPrintWindow(eqs, p, opts) {
+  opts = opts||{};
   const now = new Date();
   const dateStr = now.toLocaleDateString('es-CO',{day:'2-digit',month:'2-digit',year:'numeric'});
   const cli = (DB.get('clientes').find(c=>c.id===p.clienteId)||{}).nombre||'';
@@ -11554,14 +11530,17 @@ function _openLabelPrintWindow(eqs, p) {
     if (document.getElementById('lbl-cables')?.checked !== false) tipos.push('Cables');
     return tipos.map(cat => qlLabel(e, cat));
   }).join('\n');
-  const w = window.open('','_blank','width=320,height=400');
-  if (!w) { toast('error','Labels','Habilita las ventanas emergentes para imprimir'); return; }
+  /* En preview: se ve cada label separado, igual al impreso */
+  const previewCss = opts.preview ? `
+    html,body{width:auto;background:#F8F9FB}
+    body{display:flex;flex-direction:column;align-items:center;gap:4mm;padding:4mm 0}
+    .lbl{border:1px solid #CBD5E1;box-shadow:0 1px 4px rgba(0,0,0,.08);height:62mm}` : '';
 
-  w.document.write(`<!DOCTYPE html>
+  const docHTML = (`<!DOCTYPE html>
 <html lang="es"><head>
   <meta charset="UTF-8">
   <title>QL-800 · ${p.nombre||'Equipos'} · ${eqs.length} labels</title>
-  <style>${css}</style>
+  <style>${css}${previewCss}</style>
 </head><body>${labelsHTML}
 <script>
   /* Reduce la fuente de cada texto hasta que quepa completo (sin cortes) */
@@ -11582,6 +11561,11 @@ function _openLabelPrintWindow(eqs, p) {
   });
 <\/script>
 </body></html>`);
+  if (opts.preview) return docHTML;
+
+  const w = window.open('','_blank','width=320,height=400');
+  if (!w) { toast('error','Labels','Habilita las ventanas emergentes para imprimir'); return; }
+  w.document.write(docHTML);
   w.document.close();
 
   const waitAndPrint = () => {
